@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.time import utcnow
 from app.db.session import Base
 from app.models.enums import EmploymentStatus, Gender
 
@@ -45,14 +46,8 @@ class Employee(Base):
     country_id: Mapped[int] = mapped_column(ForeignKey("countries.id"), nullable=False)
     manager_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), nullable=True)
 
-    created_at: Mapped[dt.datetime] = mapped_column(
-        default=lambda: dt.datetime.now(dt.UTC), nullable=False
-    )
-    updated_at: Mapped[dt.datetime] = mapped_column(
-        default=lambda: dt.datetime.now(dt.UTC),
-        onupdate=lambda: dt.datetime.now(dt.UTC),
-        nullable=False,
-    )
+    created_at: Mapped[dt.datetime] = mapped_column(default=utcnow, nullable=False)
+    updated_at: Mapped[dt.datetime] = mapped_column(default=utcnow, onupdate=utcnow, nullable=False)
 
     department: Mapped["Department"] = relationship(back_populates="employees")
     job_role: Mapped["JobRole"] = relationship(back_populates="employees")

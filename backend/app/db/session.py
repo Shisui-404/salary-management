@@ -5,7 +5,9 @@ session; tests override it to point at a temporary SQLite file per test.
 """
 
 from collections.abc import Generator
+from typing import Annotated
 
+from fastapi import Depends
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -37,3 +39,10 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+# The one FastAPI dependency annotation every router uses for a DB session —
+# `Annotated[Session, Depends(get_db)]` rather than a `Depends(...)` default
+# value, which ruff's bugbear check (B008) correctly flags as a mutable/
+# call-in-default-argument smell in the general case.
+DbSession = Annotated[Session, Depends(get_db)]

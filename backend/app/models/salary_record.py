@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import BigInteger, CheckConstraint, Enum, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.time import utcnow
 from app.db.session import Base
 from app.models.enums import ChangeReason
 
@@ -48,8 +49,6 @@ class SalaryRecord(Base):
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[dt.datetime] = mapped_column(
-        default=lambda: dt.datetime.now(dt.UTC), nullable=False
-    )
+    created_at: Mapped[dt.datetime] = mapped_column(default=utcnow, nullable=False)
 
     employee: Mapped["Employee"] = relationship(back_populates="salary_records")
