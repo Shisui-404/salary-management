@@ -211,20 +211,40 @@ def validate_row(
     )
 
 
-def _resolve_references(db: Session, parsed: ParsedRow, row_number: int):
+class ReferenceLookup:
+    """Name -> reference row, loaded once per import instead of per row.
+
+    Departments, job roles, levels and countries are small, static tables, but
+    resolving them per row cost four queries per row -- 40,000 queries for a
+    10,000-row import, on top of the per-row employee lookups. Bulk-loading off
+    a spreadsheet is an explicit job-to-be-done (requirements J6), so this path
+    has to scale with the file.
+
+    Lookups are case-insensitive, matching the previous per-row queries'
+    behaviour for the names an HR manager actually types into a spreadsheet.
+    """
+
+    def __init__(self, db: Session) -> None:
+        self.departments = {d.name.casefold(): d for d in reference_repo.list_departments(db)}
+        self.job_roles = {r.name.casefold(): r for r in reference_repo.list_job_roles(db)}
+        self.levels = {level.name.casefold(): level for level in reference_repo.list_levels(db)}
+        self.countries = {c.name.casefold(): c for c in reference_repo.list_countries(db)}
+
+
+def _resolve_references(db: Session, parsed: ParsedRow, row_number: int, refs: ReferenceLookup):
     errors: list[RowError] = []
-    department = reference_repo.get_department_by_name(db, parsed.department)
+    department = refs.departments.get(parsed.department.casefold())
     if department is None:
         errors.append(
             RowError(row_number, "department", f"Unknown department {parsed.department!r}")
         )
-    job_role = reference_repo.get_job_role_by_name(db, parsed.job_role)
+    job_role = refs.job_roles.get(parsed.job_role.casefold())
     if job_role is None:
         errors.append(RowError(row_number, "job_role", f"Unknown job role {parsed.job_role!r}"))
-    level = reference_repo.get_level_by_name(db, parsed.level)
+    level = refs.levels.get(parsed.level.casefold())
     if level is None:
         errors.append(RowError(row_number, "level", f"Unknown level {parsed.level!r}"))
-    country = reference_repo.get_country_by_name(db, parsed.country)
+    country = refs.countries.get(parsed.country.casefold())
     if country is None:
         errors.append(RowError(row_number, "country", f"Unknown country {parsed.country!r}"))
 
@@ -252,6 +272,9 @@ def import_csv(db: Session, file_content: bytes) -> ImportResultData:
     failed = 0
     errors: list[RowError] = []
 
+    # Loaded once, not once per row -- see ReferenceLookup.
+    refs = ReferenceLookup(db)
+
     for row_number, raw in enumerate(reader, start=1):
         total_rows += 1
         parsed, row_errors = validate_row(raw, row_number)
@@ -261,7 +284,7 @@ def import_csv(db: Session, file_content: bytes) -> ImportResultData:
             continue
 
         department, job_role, level, country, manager, ref_errors = _resolve_references(
-            db, parsed, row_number
+            db, parsed, row_number, refs
         )
         if ref_errors:
             errors.extend(ref_errors)
