@@ -24,7 +24,7 @@ from __future__ import annotations
 import bisect
 from collections import defaultdict
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import ColumnElement, case, func, select
 from sqlalchemy.orm import Session
@@ -343,7 +343,7 @@ def _gap_pct(reference_median: int, comparison_median: int) -> float:
     if reference_median == 0:
         return 0.0
     pct = (Decimal(reference_median - comparison_median) / Decimal(reference_median)) * 100
-    return float(pct.quantize(Decimal("0.1")))
+    return float(pct.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
 
 
 def get_pay_equity(

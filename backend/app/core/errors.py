@@ -54,12 +54,12 @@ class DomainValidationError(AppError):
     """A 422 raised from a service/repository (as opposed to Pydantic's own
     request-body validation, which is handled separately below)."""
 
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     code = "validation_error"
 
 
 class SalaryEffectiveDateInvalidError(AppError):
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     code = "salary_effective_date_invalid"
 
     def __init__(self, message: str) -> None:
@@ -83,7 +83,7 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
         for err in exc.errors()
     ]
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content=_error_body("validation_error", "Request validation failed", details),
     )
 

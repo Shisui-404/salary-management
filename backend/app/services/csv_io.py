@@ -125,8 +125,10 @@ def validate_row(
             errors.append(RowError(row_number, required, "This field is required"))
 
     email = _clean(raw, "email")
-    if email and ("@" not in email or "." not in email.split("@")[-1]):
-        errors.append(RowError(row_number, "email", f"{email!r} is not a valid email address"))
+    if email:
+        local, _, domain = email.partition("@")
+        if not local or not domain or "." not in domain:
+            errors.append(RowError(row_number, "email", f"{email!r} is not a valid email address"))
 
     gender: Gender | None = None
     gender_raw = _clean(raw, "gender")
