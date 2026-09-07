@@ -24,8 +24,8 @@ export function PayEquityPanel() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ScaleIcon className="size-4" aria-hidden="true" />
-          Pay equity ({humanizeEnum(data?.overall.comparison ?? "comparison")} vs{" "}
-          {humanizeEnum(data?.overall.reference ?? "reference")})
+          Pay equity ({humanizeEnum(data?.overall?.comparison ?? "comparison")} vs{" "}
+          {humanizeEnum(data?.overall?.reference ?? "reference")})
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -39,6 +39,22 @@ export function PayEquityPanel() {
           <div className="space-y-4">
             <Skeleton className="h-16 w-full" />
             <Skeleton className="h-40 w-full" />
+          </div>
+        ) : !data.overall ? (
+          <div className="rounded-lg border border-dashed p-8 text-center">
+            <p className="text-sm font-medium">Not enough data to compare</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              A pay gap needs employees on both sides of the comparison. This
+              view has none for at least one group
+              {data.suppressed_groups > 0 ? (
+                <>
+                  , and {data.suppressed_groups} role/level group
+                  {data.suppressed_groups === 1 ? " was" : "s were"} suppressed
+                  for having fewer than {data.min_sample_size} employees
+                </>
+              ) : null}
+              .
+            </p>
           </div>
         ) : (
           <>

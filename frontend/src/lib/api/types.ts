@@ -260,7 +260,12 @@ export interface PayEquityGroup {
 export interface AnalyticsPayEquity {
   base_currency: string;
   min_sample_size: number;
-  overall: PayEquityOverall;
+  /**
+   * `null` when one side of the comparison has no employees at all — e.g. the
+   * view is filtered to a single gender. The backend declares this nullable
+   * (`app/schemas/analytics.py`), so every use site must guard it.
+   */
+  overall: PayEquityOverall | null;
   groups: PayEquityGroup[];
   suppressed_groups: number;
 }
