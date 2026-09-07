@@ -1,10 +1,5 @@
-import { PageHeader } from "@/components/shared/page-header";
+import { DashboardClient } from "@/components/analytics/dashboard-client";
 
 export default function DashboardPage() {
-  return (
-    <PageHeader
-      title="Compensation dashboard"
-      description="How ACME pays people, across departments, countries and roles."
-    />
-  );
+  return <DashboardClient />;
 }
