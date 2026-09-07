@@ -7,12 +7,17 @@ a salary in place.
 """
 
 import datetime as dt
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 from app.models.enums import EmploymentStatus, Gender
+
+if TYPE_CHECKING:
+    from app.models.reference import Country, Department, JobRole, Level
+    from app.models.salary_record import SalaryRecord
 
 
 class Employee(Base):

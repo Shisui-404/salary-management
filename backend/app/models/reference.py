@@ -5,10 +5,15 @@ group-bys in the analytics queries are index-backed joins rather than string
 matching, and so the `/reference` endpoint has one obvious source per facet.
 """
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+
+if TYPE_CHECKING:
+    from app.models.employee import Employee
 
 
 class Department(Base):

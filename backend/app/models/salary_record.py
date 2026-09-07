@@ -9,12 +9,16 @@ employee's pay history; "current salary" is simply the row where
 """
 
 import datetime as dt
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, CheckConstraint, Enum, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 from app.models.enums import ChangeReason
+
+if TYPE_CHECKING:
+    from app.models.employee import Employee
 
 
 class SalaryRecord(Base):
