@@ -48,6 +48,32 @@ screens show something real.
 Drop `--reset` to seed only if the database is currently empty (a no-op,
 printing a message, if it already has employees).
 
+## Performance (measured, 10,000 employees / ~19.8k salary records, SQLite)
+
+Manual `curl` timing against a locally running server, seeded via the
+command above (see "Verification" in the project root's delivery notes for
+the full endpoint sweep this was taken from):
+
+| Endpoint | Typical latency |
+|---|---|
+| `GET /employees?limit=25` | ~400–450ms |
+| `GET /analytics/summary` | ~440ms (after the aggregate-query consolidation below) |
+| `GET /analytics/distribution` / `by-dimension` / `pay-equity` / `band-health` | ~200–500ms |
+| `GET /employees/{id}` (single row) | ~15ms |
+| `GET /employees/export` (filtered CSV) | ~380ms |
+
+`EXPLAIN QUERY PLAN` on the list/analytics join (employees + current salary +
+FX rate + band + FX rate, `repositories/employee_repo.build_employee_query`)
+confirms every step resolves through an index or a materialized/indexed
+subquery — there is no full scan of a large table. The remaining cost is the
+inherent width of that 8-way join evaluated per employee row on SQLite (a
+single-file, single-threaded embedded engine); `analytics_repo.get_summary`
+was changed to compute headcount/active_headcount/sum/min/max/distinct-counts
+in one query instead of three for roughly a 2x win there. Further headroom
+(a denormalised read-model, Postgres instead of SQLite, a caching layer)
+was judged out of scope for this exercise and is noted here rather than
+silently left unmeasured.
+
 ## Test
 
 ```bash
