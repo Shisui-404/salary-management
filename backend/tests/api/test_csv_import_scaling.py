@@ -103,8 +103,7 @@ def test_import_still_reports_per_row_errors_after_caching(
     """The cache must not change the error contract: unknown names still fail
     their own row, by field, without stopping the rest of the file."""
     csv_bytes = (
-        HEADER
-        + "Good,Row,good.row@acme.com,female,2025-01-15,active,"
+        HEADER + "Good,Row,good.row@acme.com,female,2025-01-15,active,"
         "Engineering,Software Engineer,L2,United States\n"
         + "Bad,Dept,bad.dept@acme.com,male,2025-01-15,active,"
         "Nonexistent,Software Engineer,L2,United States\n"
@@ -130,8 +129,7 @@ def test_reference_names_match_case_insensitively(
     """The cache is keyed on casefolded names, matching what the per-row
     queries did for the names an HR manager actually types."""
     csv_bytes = (
-        HEADER
-        + "Case,Insensitive,case.insensitive@acme.com,female,2025-01-15,active,"
+        HEADER + "Case,Insensitive,case.insensitive@acme.com,female,2025-01-15,active,"
         "ENGINEERING,software engineer,l2,united states\n"
     ).encode()
 
