@@ -102,7 +102,7 @@ export function EmployeeFilters({
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <FilterField label="Department">
+        <FilterField label="Department" id="filter-department">
           <Select
             value={filters.departmentId?.toString() ?? ALL}
             onValueChange={(value) =>
@@ -111,7 +111,7 @@ export function EmployeeFilters({
               })
             }
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger id="filter-department" className="w-full">
               <SelectValue placeholder="All departments" />
             </SelectTrigger>
             <SelectContent>
@@ -125,7 +125,7 @@ export function EmployeeFilters({
           </Select>
         </FilterField>
 
-        <FilterField label="Country">
+        <FilterField label="Country" id="filter-country">
           <Select
             value={filters.countryId?.toString() ?? ALL}
             onValueChange={(value) =>
@@ -134,7 +134,7 @@ export function EmployeeFilters({
               })
             }
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger id="filter-country" className="w-full">
               <SelectValue placeholder="All countries" />
             </SelectTrigger>
             <SelectContent>
@@ -148,7 +148,7 @@ export function EmployeeFilters({
           </Select>
         </FilterField>
 
-        <FilterField label="Job role">
+        <FilterField label="Job role" id="filter-job-role">
           <Select
             value={filters.jobRoleId?.toString() ?? ALL}
             onValueChange={(value) =>
@@ -157,7 +157,7 @@ export function EmployeeFilters({
               })
             }
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger id="filter-job-role" className="w-full">
               <SelectValue placeholder="All roles" />
             </SelectTrigger>
             <SelectContent>
@@ -171,7 +171,7 @@ export function EmployeeFilters({
           </Select>
         </FilterField>
 
-        <FilterField label="Level">
+        <FilterField label="Level" id="filter-level">
           <Select
             value={filters.levelId?.toString() ?? ALL}
             onValueChange={(value) =>
@@ -180,7 +180,7 @@ export function EmployeeFilters({
               })
             }
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger id="filter-level" className="w-full">
               <SelectValue placeholder="All levels" />
             </SelectTrigger>
             <SelectContent>
@@ -194,7 +194,7 @@ export function EmployeeFilters({
           </Select>
         </FilterField>
 
-        <FilterField label="Status">
+        <FilterField label="Status" id="filter-status">
           <Select
             value={filters.employmentStatus ?? ALL}
             onValueChange={(value) =>
@@ -206,7 +206,7 @@ export function EmployeeFilters({
               })
             }
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger id="filter-status" className="w-full">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
@@ -220,7 +220,7 @@ export function EmployeeFilters({
           </Select>
         </FilterField>
 
-        <FilterField label="Band position">
+        <FilterField label="Band position" id="filter-band-position">
           <Select
             value={filters.bandPosition ?? ALL}
             onValueChange={(value) =>
@@ -232,7 +232,7 @@ export function EmployeeFilters({
               })
             }
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger id="filter-band-position" className="w-full">
               <SelectValue placeholder="Any position" />
             </SelectTrigger>
             <SelectContent>
@@ -247,8 +247,12 @@ export function EmployeeFilters({
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:max-w-xs">
-        <FilterField label={`Min salary (${reference?.base_currency ?? "USD"})`}>
+        <FilterField
+          label={`Min salary (${reference?.base_currency ?? "USD"})`}
+          id="filter-min-salary"
+        >
           <Input
+            id="filter-min-salary"
             type="number"
             inputMode="numeric"
             min={0}
@@ -257,8 +261,12 @@ export function EmployeeFilters({
             onChange={(event) => setMinSalary(event.target.value)}
           />
         </FilterField>
-        <FilterField label={`Max salary (${reference?.base_currency ?? "USD"})`}>
+        <FilterField
+          label={`Max salary (${reference?.base_currency ?? "USD"})`}
+          id="filter-max-salary"
+        >
           <Input
+            id="filter-max-salary"
             type="number"
             inputMode="numeric"
             min={0}
@@ -274,14 +282,18 @@ export function EmployeeFilters({
 
 function FilterField({
   label,
+  id,
   children,
 }: {
   label: string;
+  id: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label htmlFor={id} className="text-xs text-muted-foreground">
+        {label}
+      </Label>
       {children}
     </div>
   );
