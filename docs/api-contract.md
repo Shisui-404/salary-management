@@ -138,7 +138,8 @@ Body:
 Closes the open record (`effective_to = effective_from - 1 day`) and inserts the new one, in one
 transaction.
 → `201` `SalaryRecord` · `404` · `422` `salary_effective_date_invalid` (date not after the
-current record's `effective_from`) · `422` validation.
+current record's `effective_from`) · `422` validation · `409` `concurrent_salary_change` when a
+competing raise for the same employee committed first — re-read the current salary and retry.
 
 ### `GET /employees/export` — CSV
 Accepts the same filters as `GET /employees`. → `200` `text/csv`, `Content-Disposition: attachment`.

@@ -13,9 +13,14 @@ from __future__ import annotations
 import datetime as dt
 from decimal import Decimal
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.errors import EmployeeNotFoundError, SalaryEffectiveDateInvalidError
+from app.core.errors import (
+    ConcurrentSalaryChangeError,
+    EmployeeNotFoundError,
+    SalaryEffectiveDateInvalidError,
+)
 from app.models.enums import ChangeReason
 from app.models.salary_record import SalaryRecord
 from app.repositories import employee_repo, salary_repo
@@ -60,7 +65,10 @@ def record_salary_change(
     if employee_repo.get_employee_or_none(db, employee_id) is None:
         raise EmployeeNotFoundError(employee_id)
 
-    current = salary_repo.get_open_record(db, employee_id)
+    # Lock the open record for the duration of this transaction, so a
+    # simultaneous raise for the same employee cannot read the same "current"
+    # row and race us to replace it.
+    current = salary_repo.get_open_record(db, employee_id, for_update=True)
     m = money.Money.from_decimal(amount, currency)
 
     if current is not None:
@@ -71,15 +79,23 @@ def record_salary_change(
             )
         salary_repo.close_record(current, effective_to=effective_from - dt.timedelta(days=1))
 
-    return salary_repo.insert_record(
-        db,
-        employee_id=employee_id,
-        amount_minor=m.amount_minor,
-        currency=m.currency,
-        effective_from=effective_from,
-        change_reason=change_reason,
-        note=note,
-    )
+    try:
+        return salary_repo.insert_record(
+            db,
+            employee_id=employee_id,
+            amount_minor=m.amount_minor,
+            currency=m.currency,
+            effective_from=effective_from,
+            change_reason=change_reason,
+            note=note,
+        )
+    except IntegrityError as exc:
+        # The partial unique index rejected a second open record: another
+        # transaction committed a raise for this employee first. Roll back so
+        # the session is usable, and report a retryable conflict rather than
+        # letting this surface as a 500.
+        db.rollback()
+        raise ConcurrentSalaryChangeError(employee_id) from exc
 
 
 def get_salary_history_with_change_pct(

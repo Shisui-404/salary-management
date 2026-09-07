@@ -10,7 +10,11 @@ never render an employee differently.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 from sqlalchemy import Row
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -116,6 +120,25 @@ def _validate_references(
         raise DomainValidationError("Referenced entity does not exist", details=errors)
 
 
+@contextmanager
+def _translating_email_conflict(db: Session, email: str) -> Iterator[None]:
+    """Translate a unique-constraint violation on `email` into the contract's 409.
+
+    `get_by_email` is a read followed by a write, so two concurrent requests
+    can both pass that check and collide only when the row actually hits the
+    database — which happens at FLUSH (where the id is assigned) as well as at
+    COMMIT. Both are covered here, so the loser of the race gets the
+    `email_already_exists` the contract promises rather than an unhandled 500.
+    """
+    try:
+        yield
+    except IntegrityError as exc:
+        db.rollback()
+        if "email" in str(exc.orig).lower():
+            raise EmailAlreadyExistsError(email) from exc
+        raise
+
+
 def create_employee(db: Session, data: EmployeeCreate) -> EmployeeOut:
     if employee_repo.get_by_email(db, str(data.email)) is not None:
         raise EmailAlreadyExistsError(str(data.email))
@@ -143,21 +166,23 @@ def create_employee(db: Session, data: EmployeeCreate) -> EmployeeOut:
         country_id=data.country_id,
         manager_id=data.manager_id,
     )
-    db.add(employee)
-    db.flush()  # assigns employee.id
+    with _translating_email_conflict(db, str(data.email)):
+        db.add(employee)
+        db.flush()  # assigns employee.id
 
-    employee.employee_code = f"ACME-{employee.id:06d}"
+        employee.employee_code = f"ACME-{employee.id:06d}"
 
-    if data.initial_salary is not None:
-        create_initial_salary(
-            db,
-            employee_id=employee.id,
-            amount=data.initial_salary.amount,
-            currency=data.initial_salary.currency,
-            effective_from=data.hire_date,
-        )
+        if data.initial_salary is not None:
+            create_initial_salary(
+                db,
+                employee_id=employee.id,
+                amount=data.initial_salary.amount,
+                currency=data.initial_salary.currency,
+                effective_from=data.hire_date,
+            )
 
-    db.commit()
+        db.commit()
+
     return get_employee_out(db, employee.id)
 
 
@@ -191,5 +216,7 @@ def update_employee(db: Session, employee_id: int, data: EmployeeUpdate) -> Empl
     for field_name, value in fields.items():
         setattr(employee, field_name, value)
 
-    db.commit()
+    with _translating_email_conflict(db, fields.get("email", employee.email)):
+        db.commit()
+
     return get_employee_out(db, employee_id)

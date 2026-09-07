@@ -50,6 +50,23 @@ class EmailAlreadyExistsError(ConflictError):
         super().__init__(f"An employee with email {email!r} already exists")
 
 
+class ConcurrentSalaryChangeError(ConflictError):
+    """Two salary changes for the same employee raced each other.
+
+    The partial unique index on `salary_records` guarantees only one open
+    record survives; the loser lands here and is told to retry rather than
+    receiving a 500.
+    """
+
+    code = "concurrent_salary_change"
+
+    def __init__(self, employee_id: int) -> None:
+        super().__init__(
+            f"A concurrent salary change for employee {employee_id} was committed first. "
+            "Re-read the current salary and retry."
+        )
+
+
 class DomainValidationError(AppError):
     """A 422 raised from a service/repository (as opposed to Pydantic's own
     request-body validation, which is handled separately below)."""

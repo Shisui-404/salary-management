@@ -19,10 +19,24 @@ from app.models.enums import ChangeReason
 from app.models.salary_record import SalaryRecord
 
 
-def get_open_record(db: Session, employee_id: int) -> SalaryRecord | None:
+def get_open_record(
+    db: Session, employee_id: int, *, for_update: bool = False
+) -> SalaryRecord | None:
+    """The employee's current salary record, or None if they have never had one.
+
+    `for_update` takes a row lock so a concurrent raise for the same employee
+    blocks until this transaction finishes, instead of reading the same
+    "current" record and racing to replace it. On Postgres this emits
+    `SELECT ... FOR UPDATE`; SQLite has no row-level locking and serialises
+    write transactions instead, so SQLAlchemy omits the clause there. The
+    partial unique index on `salary_records` is the backstop that makes the
+    invariant hold on both.
+    """
     stmt = select(SalaryRecord).where(
         SalaryRecord.employee_id == employee_id, SalaryRecord.effective_to.is_(None)
     )
+    if for_update:
+        stmt = stmt.with_for_update()
     return db.execute(stmt).scalar_one_or_none()
 
 

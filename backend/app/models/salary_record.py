@@ -11,7 +11,7 @@ employee's pay history; "current salary" is simply the row where
 import datetime as dt
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, CheckConstraint, Enum, ForeignKey, Index, String, Text
+from sqlalchemy import BigInteger, CheckConstraint, Enum, ForeignKey, Index, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.time import utcnow
@@ -26,13 +26,25 @@ class SalaryRecord(Base):
     __tablename__ = "salary_records"
     __table_args__ = (
         CheckConstraint("amount_minor >= 0", name="ck_salary_records_amount_non_negative"),
-        # Partial-index intent: on Postgres this could be
-        # `Index(..., postgresql_where=text("effective_to IS NULL"))` to make
-        # "find the open record" an index-only scan. SQLite (our default
-        # here) does not need the predicate to still use the index
-        # effectively at this scale, so a plain composite index is used for
-        # portability across both dialects.
         Index("ix_salary_records_employee_open", "employee_id", "effective_to"),
+        # The append-only invariant, enforced by the database rather than
+        # merely by convention: an employee may have at most ONE open
+        # (`effective_to IS NULL`) salary record. Without this, two
+        # concurrent raises can each read the same "current" record before
+        # either commits and both insert an open row, leaving the employee
+        # with two current salaries -- after which `get_open_record`'s
+        # `scalar_one_or_none()` raises and the employee can no longer be
+        # given a raise at all. Partial unique indexes are supported by both
+        # SQLite (>= 3.8.0) and Postgres, so the guarantee is identical on
+        # each. `services/salary_service.py` catches the resulting
+        # IntegrityError and returns 409 rather than a 500.
+        Index(
+            "uq_salary_records_one_open_per_employee",
+            "employee_id",
+            unique=True,
+            sqlite_where=text("effective_to IS NULL"),
+            postgresql_where=text("effective_to IS NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
