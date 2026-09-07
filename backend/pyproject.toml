@@ -22,6 +22,7 @@ testpaths = ["tests"]
 addopts = "-q"
 filterwarnings = [
     "ignore::DeprecationWarning",
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated.*:UserWarning",
 ]
 
 [tool.coverage.run]

@@ -63,7 +63,10 @@ def _build_expressions(sr_rate, sb_rate) -> EmployeeQueryExpressions:
         else_=None,
     )
     band_position_expr = case(
-        (SalaryBand.id.is_(None), literal(BandPosition.UNBANDED.value)),
+        (
+            or_(SalaryBand.id.is_(None), SalaryRecord.id.is_(None)),
+            literal(BandPosition.UNBANDED.value),
+        ),
         (amount_base < band_min_base, literal(BandPosition.BELOW.value)),
         (amount_base > band_max_base, literal(BandPosition.ABOVE.value)),
         else_=literal(BandPosition.WITHIN.value),

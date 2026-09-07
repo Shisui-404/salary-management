@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import datetime as dt
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from app.models.enums import ChangeReason
+from app.schemas._money_validators import validate_salary_amount
 
 
 class SalaryRecordOut(BaseModel):
@@ -43,3 +44,5 @@ class SalaryCreateIn(BaseModel):
     effective_from: dt.date
     change_reason: ChangeReason
     note: str | None = None
+
+    _validate_amount = field_validator("amount")(validate_salary_amount)

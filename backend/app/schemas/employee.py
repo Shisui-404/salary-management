@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import datetime as dt
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.models.enums import BandPosition, ChangeReason, EmploymentStatus, Gender
+from app.schemas._money_validators import validate_salary_amount
 from app.schemas.reference import CountryRef, LevelRef, RefItem
 
 
@@ -59,6 +60,8 @@ class EmployeeOut(BaseModel):
 class InitialSalaryIn(BaseModel):
     amount: str
     currency: str = Field(min_length=3, max_length=3)
+
+    _validate_amount = field_validator("amount")(validate_salary_amount)
 
 
 class EmployeeCreate(BaseModel):
