@@ -31,19 +31,25 @@ class Employee(Base):
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     gender: Mapped[Gender] = mapped_column(
-        Enum(Gender, native_enum=False, length=20), nullable=False
+        Enum(Gender, native_enum=False, length=20), nullable=False, index=True
     )
-    hire_date: Mapped[dt.date] = mapped_column(nullable=False)
+    hire_date: Mapped[dt.date] = mapped_column(nullable=False, index=True)
     employment_status: Mapped[EmploymentStatus] = mapped_column(
         Enum(EmploymentStatus, native_enum=False, length=20),
         nullable=False,
         default=EmploymentStatus.ACTIVE,
+        index=True,
     )
 
-    department_id: Mapped[int] = mapped_column(ForeignKey("departments.id"), nullable=False)
-    job_role_id: Mapped[int] = mapped_column(ForeignKey("job_roles.id"), nullable=False)
-    level_id: Mapped[int] = mapped_column(ForeignKey("levels.id"), nullable=False)
-    country_id: Mapped[int] = mapped_column(ForeignKey("countries.id"), nullable=False)
+    # Indexed: every one of these is a facet filter on GET /employees and every
+    # /analytics/* endpoint (see repositories/employee_repo.apply_filters), so
+    # a filtered list/aggregate at 10k+ rows stays an index lookup, not a scan.
+    department_id: Mapped[int] = mapped_column(
+        ForeignKey("departments.id"), nullable=False, index=True
+    )
+    job_role_id: Mapped[int] = mapped_column(ForeignKey("job_roles.id"), nullable=False, index=True)
+    level_id: Mapped[int] = mapped_column(ForeignKey("levels.id"), nullable=False, index=True)
+    country_id: Mapped[int] = mapped_column(ForeignKey("countries.id"), nullable=False, index=True)
     manager_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), nullable=True)
 
     created_at: Mapped[dt.datetime] = mapped_column(default=utcnow, nullable=False)

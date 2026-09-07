@@ -7,6 +7,11 @@ python-multipart==0.0.32
 email-validator==2.3.0
 httpx==0.28.1
 
+# Postgres driver -- SQLite is the default (DATABASE_URL=sqlite:///./salary.db),
+# but the ORM/queries are dialect-agnostic (see docs/decisions/ADR-004) and
+# docker-compose.yml points DATABASE_URL at Postgres, which needs this.
+psycopg[binary]==3.2.3
+
 # dev / test
 pytest==9.1.1
 pytest-cov==7.1.0

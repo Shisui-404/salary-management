@@ -121,15 +121,14 @@ def get_summary(db: Session, filters: EmployeeFilterParams) -> SummaryData:
     sub = filtered_subquery(filters)
     amt = sub.c.amount_base_minor
 
-    headcount = db.execute(select(func.count()).select_from(sub)).scalar_one()
-    active_headcount = db.execute(
-        select(func.count())
-        .select_from(sub)
-        .where(sub.c.employment_status == EmploymentStatus.ACTIVE.value)
-    ).scalar_one()
-
+    # One aggregate query over the (expensive, multi-join) filtered subquery
+    # rather than three separate ones -- each execution re-walks the full
+    # employee+salary+band+FX join, so cutting three round trips to one is a
+    # meaningful win at 10k rows (see the perf numbers in backend/README.md).
     agg = db.execute(
         select(
+            func.count(),
+            func.count().filter(sub.c.employment_status == EmploymentStatus.ACTIVE.value),
             func.sum(amt),
             func.min(amt),
             func.max(amt),
@@ -139,7 +138,17 @@ def get_summary(db: Session, filters: EmployeeFilterParams) -> SummaryData:
             func.count().filter(sub.c.band_position != BandPosition.UNBANDED.value),
         ).select_from(sub)
     ).one()
-    total_payroll, min_amt, max_amt, salaried_count, countries, departments, banded = agg
+    (
+        headcount,
+        active_headcount,
+        total_payroll,
+        min_amt,
+        max_amt,
+        salaried_count,
+        countries,
+        departments,
+        banded,
+    ) = agg
 
     total_payroll = int(total_payroll or 0)
     mean_minor = (
