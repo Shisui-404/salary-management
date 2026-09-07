@@ -50,47 +50,83 @@ printing a message, if it already has employees).
 
 ## Performance (measured, 10,000 employees / ~19.8k salary records, SQLite)
 
-Measured twice, because the first set of numbers was misleading. The database
-file's **filesystem** dominates everything else here.
+Measured three times, because the first two readings each pointed at the
+wrong thing. Numbers are three warm runs against the seeded 10,000-employee
+dataset.
 
-| Endpoint | On `/mnt/c` (NTFS via WSL) | On a native Linux filesystem |
+End-to-end HTTP latency, three warm runs each, 10,000 employees / 19,794
+salary records:
+
+| Endpoint | On `/mnt/c` (NTFS via WSL) | Native FS, before query fix | Native FS, after |
+|---|---|---|---|
+| `GET /employees?limit=25` (default sort) | ~500ms | ~42–88ms | **~17–19ms** |
+| `GET /employees` filtered | ~410ms | ~21–28ms | **~13ms** |
+| `GET /employees/{id}` | ~16ms | ~5–13ms | **~8ms** |
+| `GET /analytics/summary` | ~450ms | ~68–100ms | ~68–100ms |
+| `GET /analytics/distribution` | ~450ms | ~67–90ms | ~67–90ms |
+| `GET /analytics/by-dimension` | ~2,980ms | ~77–90ms | ~77–90ms |
+| `GET /analytics/pay-equity` | ~440ms | ~55–78ms | ~55–78ms |
+| `GET /analytics/band-health` | ~415ms | ~53–64ms | ~53–64ms |
+| Seed 10,000 employees | — | — | **~2.1s** |
+
+Endpoints measured only after the fix: `GET /employees?sort=-salary` ~47ms,
+`GET /employees?offset=9000` ~26ms, `GET /employees?search=an` ~34ms.
+
+At the query level, measured in-process so the numbers isolate the SQL rather
+than HTTP and serialisation:
+
+| Query | Before | After |
 |---|---|---|
-| `GET /employees?limit=25` | ~500ms | **~42–88ms** |
-| `GET /employees?...` filtered + sorted | ~410ms | **~21–28ms** |
-| `GET /employees/{id}` | ~16ms | **~5–13ms** |
-| `GET /analytics/summary` | ~450ms | **~68–100ms** |
-| `GET /analytics/distribution` | ~450ms | **~67–90ms** |
-| `GET /analytics/by-dimension` | ~2,980ms | **~77–90ms** |
-| `GET /analytics/pay-equity` | ~440ms | **~55–78ms** |
-| `GET /analytics/band-health` | ~415ms | **~53–64ms** |
+| Page of 25, default sort | ~30ms | **~9.6ms** |
+| Its `total` count | ~26ms | **~0.4ms** |
+| Page of 25, `sort=-salary` | ~28ms | ~40ms |
 
-The development checkout lives on a Windows drive mounted into WSL. SQLite is
-I/O-bound on many small reads, and that mount adds latency to every one of
-them — a bare `SELECT COUNT(*)` costs 23ms on the mount versus 0.4ms on ext4,
-and an indexed join scan 80ms versus 2.4ms, a ~30x penalty before any
-application code runs. Copying the identical database file to a native
-filesystem and re-running the identical binary produced the right-hand column;
-`by-dimension` went from 3.0s to 0.08s, a 35x improvement with **no code
-change at all**.
+Two separate things were wrong, and it took two rounds of measurement to
+separate them.
 
-So the honest conclusion is: the query design was never the bottleneck, and
-an earlier reading of these numbers that blamed "the inherent width of the
-8-way join on SQLite" was wrong. `EXPLAIN QUERY PLAN` on the list and
-analytics joins (`repositories/employee_repo.build_employee_query`) confirms
-every step resolves through an index or an indexed subquery, with no full scan
-of a large table. One genuine improvement was made along the way:
-`analytics_repo.get_summary` computes headcount, active headcount, sum, min,
-max and distinct counts in a single query rather than three.
+**The filesystem.** The checkout lives on a Windows drive mounted into WSL.
+SQLite issues many small reads and that mount makes each one expensive: a bare
+`SELECT COUNT(*)` costs 23ms there against 0.4ms on ext4, and an indexed join
+scan 80ms against 2.4ms. That is a ~30x tax before any application code runs,
+and it accounted for most of the first column.
 
-Two lessons worth stating plainly, since measurement judgement is part of what
-this exercise is testing: benchmark on a filesystem representative of
-production, and be suspicious of a plausible-sounding explanation that was
-never actually tested against an alternative.
+**The query shape.** Having found the filesystem effect, the first write-up
+concluded the queries themselves were fine. A later review showed that was
+only half right. `EXPLAIN QUERY PLAN` on the list query ends in
+`USE TEMP B-TREE FOR ORDER BY` *after* every join — SQLite built all 10,000
+joined rows (including two materialised FX-rate subqueries), sorted them, then
+discarded all but 25. The count query paid that same cost to produce a number
+that needed no joins at all.
 
-Remaining headroom, deliberately not pursued: Postgres (where `percentile_cont`
-replaces the Python percentile fallback), a denormalised read model for the
-directory, and response caching for the analytics endpoints. None are
-warranted at 10k employees with these numbers.
+The fix, in `repositories/employee_repo.py`:
+- `count_matching` counts over `employees` alone unless a filter actually
+  depends on compensation data (only `band_position` and the salary-range
+  filters do). 26ms → 0.4ms.
+- `get_page_rows` selects the page of **ids** first, from `employees` alone,
+  then applies the wide join to just those 25 rows — O(page size) instead of
+  O(all employees) per page load.
+- Sorting by `salary` or `compa_ratio`, or filtering by band, genuinely needs
+  the join to decide *which* rows belong on the page, so those keep the single
+  joined query. Splitting them in two was measured and was slower, because it
+  pays the join cost twice.
+- Every sort now carries `Employee.id` as a final tie-break, so employees with
+  equal sort keys have a total order and OFFSET paging cannot repeat or skip a
+  row.
+
+**One deliberate regression.** The tie-break costs about 12ms on the
+compensation sorts (28ms → 40ms) and ~1.6ms on the default sort, because it
+adds a second term to the ORDER BY. It is kept: unstable pagination silently
+shows one employee twice and hides another, which is a much worse failure in a
+salary tool than 12ms on a non-default sort. The cost is stated here rather
+than left for someone to rediscover.
+
+Inlining the FX rates as a `CASE` expression instead of two subquery joins was
+measured too (13.6ms → 11.2ms on the salary sort) and rejected: the remaining
+cost is the unavoidable scan-and-sort, so it was not worth the churn.
+
+The honest summary is that the first conclusion — "it's the mount, the query
+is fine" — was a plausible story that was only half true, and it took someone
+re-measuring the query shape in isolation to find the other half.
 
 ## Test
 

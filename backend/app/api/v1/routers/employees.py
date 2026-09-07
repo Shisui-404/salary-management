@@ -32,12 +32,8 @@ def list_employees(
     params: Annotated[EmployeeListParams, Query()],
     db: DbSession,
 ) -> Page[EmployeeOut]:
-    stmt, expr = employee_repo.build_employee_query()
-    stmt = employee_repo.apply_filters(stmt, expr, params)
-    total = employee_repo.count_matching(db, stmt)
-    stmt = employee_repo.apply_sort(stmt, expr, params.sort)
-    stmt = stmt.limit(params.limit).offset(params.offset)
-    rows = db.execute(stmt).all()
+    total = employee_repo.count_matching(db, params)
+    rows = employee_repo.get_page_rows(db, params, params.sort, params.limit, params.offset)
     items = [employee_service.row_to_employee_out(row) for row in rows]
     return Page[EmployeeOut](items=items, total=total, limit=params.limit, offset=params.offset)
 
